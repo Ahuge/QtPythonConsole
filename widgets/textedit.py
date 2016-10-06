@@ -1,4 +1,4 @@
-from Qt import QtGui, QtWidgets
+from QtPythonConsole.Qt.Qt import QtGui, QtWidgets
 
 
 class TextEdit(QtWidgets.QTextEdit):

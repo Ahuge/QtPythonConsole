@@ -1,4 +1,4 @@
-from Qt import QtWidgets
+from Qt.Qt import QtWidgets
 
 from widgets.output import OutputConsole
 from widgets.input import InputConsole

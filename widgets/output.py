@@ -1,5 +1,5 @@
 from cStringIO import StringIO
-from Qt import QtGui
+from QtPythonConsole.Qt.Qt import QtGui
 from textedit import TextEdit
 
 

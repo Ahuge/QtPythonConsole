@@ -1,7 +1,7 @@
 import sys
 import json
-from Qt import QtCore, QtGui, QtWidgets
-from user import User
+from QtPythonConsole.Qt.Qt import QtCore, QtGui, QtWidgets
+from QtPythonConsole.user import User
 from utils import Completer, MyHighlighter
 from textedit import TextEdit
 
