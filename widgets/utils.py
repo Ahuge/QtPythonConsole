@@ -1,4 +1,4 @@
-from Qt.Qt import QtCore, QtGui, QtWidgets
+from Qt import QtCore, QtGui, QtWidgets
 
 
 class Completer(QtWidgets.QCompleter):
