@@ -1,6 +1,6 @@
 from cStringIO import StringIO
-from QtPythonConsole import QtGui
-from widget_textedit import TextEdit
+from Qt import QtGui
+from textedit import TextEdit
 
 
 class OutputConsole(TextEdit):

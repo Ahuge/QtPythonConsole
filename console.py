@@ -1,6 +1,7 @@
-from QtPythonConsole import QtWidgets
-from widget_output_console import OutputConsole
-from widget_input_console import InputConsole
+from Qt import QtWidgets
+
+from widgets.output import OutputConsole
+from widgets.input import InputConsole
 import code
 
 
@@ -53,7 +54,7 @@ class ConsoleWidget(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-    from QtPythonConsole import QtGui
+    from Qt import QtGui
     app = QtGui.QApplication.instance()
     if not app:
         app = QtGui.QApplication([])

@@ -1,9 +1,9 @@
 import sys
 import json
-from QtPythonConsole import QtCore, QtGui, QtWidgets
-from user_settings import User
-from widget_utils import Completer, MyHighlighter
-from widget_textedit import TextEdit
+from Qt import QtCore, QtGui, QtWidgets
+from user import User
+from utils import Completer, MyHighlighter
+from textedit import TextEdit
 
 DEFAULT_CODE = '#use the variable "projects" to refer to currently selected items in the project tree'
 
