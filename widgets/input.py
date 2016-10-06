@@ -16,10 +16,11 @@ class InputConsole(TextEdit):
         super(InputConsole, self).__init__(parent)
         self.completer = None
         self.namespace = globals().copy()
-        self.setCompleter(Completer([]))
+
+        self.set_completer(Completer(QtGui.QAbstractListModel(['One Fish', 'Two Fish', 'Red Fish', 'Salamander!'])))
         self.user = User(appname)
         self.interpreter = interpreter
-        self.stdout = stdout
+        self.s = stdout
         if code is None:
             self.loadUserCache()
             self.textChanged.connect(self.saveUserCache)
@@ -28,6 +29,9 @@ class InputConsole(TextEdit):
 
         self.highlighter = MyHighlighter(self.document())
         self.cursorPositionChanged.connect(self.highlightCurrentLine)
+
+        # Temporary setting to execute raw text untill sysout is stable
+        self.DEBUG_STRING_EXECUTE = True
 
     def emitCode(self):
         self.code.emit(self.toPlainText())
@@ -134,22 +138,21 @@ class InputConsole(TextEdit):
         menu = self.createStandardContextMenu()
         menu.exec_(self.mapToGlobal(event.pos()))
 
-    def setCompleter(self, completer):
+    def set_completer(self, completer):
         if self.completer:
             self.disconnect(self.completer, 0, 0)
         self.completer = completer
-        if not self.completer:
-            return
-        self.completer.setWidget(self)
-        self.completer.setCompletionMode(QtWidgets.QCompleter.PopupCompletion)
-        self.completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
-        self.completer.activated.connect(self.insertCompletion)
-        # self.connect(self.completer, SIGNAL('activated(QString)'), self.insertCompletion)
+        if self.completer:
+            self.completer.setWidget(self)
+            self.completer.setCompletionMode(QtWidgets.QCompleter.PopupCompletion)
+            self.completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
+            self.completer.activated.connect(self.insert_completion)
 
     def completer(self):
         return self.completer
 
-    def insertCompletion(self, string):
+    def insert_completion(self, string):
+        print string, '----->>>'
         tc = self.textCursor()
         tc.movePosition(QtGui.QTextCursor.StartOfWord, QtGui.QTextCursor.KeepAnchor)
         tc.insertText(string)
@@ -162,53 +165,38 @@ class InputConsole(TextEdit):
 
     def keyPressEvent(self, e):
 
-        # Enter or return pressed with control modifier
+        # Make sure to add descriptiveQAbstractListModel comments for any new keyPress events...
+        completer_model = self.completer.model()
+        completer_model.items = ['Potatoes', 'barley']
+        self.completer.popup().show()
+        self.completer.popup().setCurrentIndex(completer_model.index(0, 0))
+
+        curser_rect = self.cursorRect()
+        curser_rect.setWidth(self.completer.popup().sizeHintForColumn(0) + self.completer.popup().verticalScrollBar().sizeHint().width())
+        self.completer.complete(curser_rect)
+
+        # Handle Ctrl+Enter event
         if e.modifiers() == QtCore.Qt.ControlModifier and (
                         e.key() == QtCore.Qt.Key_Enter or e.key() == QtCore.Qt.Key_Return):
-            self.executeSelected()
+            if self.DEBUG_STRING_EXECUTE:
+                exec(self.toPlainText())
+                return
+            else:
+                self.executeSelected()
             return
 
-        if e.key() == QtCore.Qt.Key_Tab:
+        # Handle Tab event
+        elif e.key() == QtCore.Qt.Key_Tab:
             tc = self.textCursor()
             tc.insertText('   ')
             self.setTextCursor(tc)
             return
 
-        # Completer in progress
-        if self.completer and self.completer.popup().isVisible():
-            if e.key() in (QtCore.Qt.Key_Enter, QtCore.Qt.Key_Return, QtCore.Qt.Key_Escape,
-                           QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab):
-                e.ignore()
-                return
 
-        isShortcut = ((e.modifiers() & QtCore.Qt.ControlModifier) and e.key() == QtCore.Qt.Key_E)
-        if not self.completer or not isShortcut:
-            return super(TextEdit, self).keyPressEvent(e)
 
-        ctrlOrShift = e.modifiers() & (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier)
-        if not self.completer or (ctrlOrShift and not e.text()):
-            return
 
-        eow = str("~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-=")
-        hasModifier = (e.modifiers() != QtCore.Qt.NoModifier) and not ctrlOrShift
-        completionPrefix = self.textUnderCursor()
 
-        if (not isShortcut
-            and (hasModifier
-                 or not e.text()
-                 or len(completionPrefix) < 2
-                 or e.text()[-1] in eow)):
-            self.completer.popup().hide()
-            return
 
-        itemList = self.namespace.keys()
-        self.completer.update([k for k in itemList if completionPrefix in k])
-        self.completer.popup().setCurrentIndex(self.completer.completionModel().index(0, 0))
-
-        cr = self.cursorRect()
-        cr.setWidth(self.completer.popup().sizeHintForColumn(0)
-                    + self.completer.popup().verticalScrollBar().sizeHint().width())
-        self.completer.complete(cr)
-
-    def setCode(self, code):
-        self.document().setPlainText(code)
+        # Fall back to default functionality
+        else:
+            super(InputConsole, self).keyPressEvent(e)
