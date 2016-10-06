@@ -3,7 +3,7 @@ import os
 import logging
 import platform
 
-logger = logging.getLogger("RvTerminal")
+logger = logging.getLogger("QtPythonConsole")
 
 
 class User(object):
