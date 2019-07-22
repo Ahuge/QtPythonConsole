@@ -20,7 +20,7 @@ class User(object):
     @property
     def appdata(self):
 
-        if platform.system() is 'Linux':
+        if platform.system() == 'Linux':
             return os.getenv('HOME')
 
         if platform.system() in ['Darwin']:
