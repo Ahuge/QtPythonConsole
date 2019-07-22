@@ -25,7 +25,7 @@ class ConsoleDialog(QtWidgets.QDialog):
 
 
 class ConsoleWidget(QtWidgets.QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, _locals=None, *args, **kwargs):
         super(ConsoleWidget, self).__init__(*args, **kwargs)
 
         # create widgets
@@ -33,7 +33,7 @@ class ConsoleWidget(QtWidgets.QWidget):
         self.output_console = OutputConsole()
         self.input_console = InputConsole(
             appname="Rv Python Terminal",
-            interpreter=code.InteractiveConsole(),
+            interpreter=code.InteractiveConsole(locals=_locals),
             stdout=self.output_console.stdin
         )
 
