@@ -19,6 +19,7 @@ class OutputConsole(TextEdit):
 
     def read_stdin(self):
         self.document().setPlainText(self.stdin.getvalue())
+        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
 
     def clear(self):
         self.stdin.truncate(0)
