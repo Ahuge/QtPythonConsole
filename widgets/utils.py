@@ -5,7 +5,7 @@ class Completer(QtWidgets.QCompleter):
     def __init__(self, stringlist, parent=None):
         super(Completer, self).__init__(parent)
         self.stringlist = stringlist
-        self.setModel(QtGui.QStringListModel(self.stringlist))
+        self.setModel(QtCore.QStringListModel(self.stringlist))
 
     def update(self, completionText):
         self.model().setStringList(completionText)
