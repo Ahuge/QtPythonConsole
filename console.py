@@ -54,10 +54,13 @@ class ConsoleWidget(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-    from Qt import QtGui
-    app = QtGui.QApplication.instance()
+    from Qt import QtWidgets
+    app = QtWidgets.QApplication.instance()
+    created = False
     if not app:
-        app = QtGui.QApplication([])
+        app = QtWidgets.QApplication([])
+        created = True
     d = ConsoleDialog()
     d.show()
-    app.exec_()
+    if created:
+        app.exec_()
