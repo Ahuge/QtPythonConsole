@@ -6,11 +6,11 @@ import code
 
 
 class ConsoleDialog(QtWidgets.QDialog):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, _locals=None, *args, **kwargs):
         super(ConsoleDialog, self).__init__(*args, **kwargs)
 
         # create widgets
-        self.console_widget = ConsoleWidget(self)
+        self.console_widget = ConsoleWidget(parent=self, _locals=_locals)
 
         # create layouts
         self.top_layout = QtWidgets.QVBoxLayout(self)
