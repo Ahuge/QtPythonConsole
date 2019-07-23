@@ -1,9 +1,16 @@
+import contextlib
 import sys
 import json
+import re
+
 from Qt import QtCore, QtGui, QtWidgets
+import six
+
+from six import text_type
+
 from QtPythonConsole.user import User
-from utils import Completer, MyHighlighter
-from textedit import TextEdit
+from .utils import Completer, MyHighlighter
+from .textedit import TextEdit
 
 DEFAULT_CODE = '#use the variable "projects" to refer to currently selected items in the project tree'
 
@@ -11,14 +18,17 @@ DEFAULT_CODE = '#use the variable "projects" to refer to currently selected item
 class InputConsole(TextEdit):
     code = QtCore.Signal(str)
     CODE_EXECUTED = QtCore.Signal()
+    LINE_CONST = "LINENUMBERCONST"
+    EXCEPTION_MESSAGE = """
+RuntimeError: The following exception was thrown while executing code from line {start_row}-{end_row}:
+    {exception}"""
 
-    def __init__(self, parent=None, code=None, appname=None, stdout=None, interpreter=None):
+    def __init__(self, parent=None, code=None, appname=None, stdout=None):
         super(InputConsole, self).__init__(parent)
         self.completer = None
         self.namespace = globals().copy()
         self.setCompleter(Completer([]))
         self.user = User(appname)
-        self.interpreter = interpreter
         self.stdout = stdout
         if code is None:
             self.loadUserCache()
@@ -29,9 +39,13 @@ class InputConsole(TextEdit):
         self.highlighter = MyHighlighter(self.document())
         self.cursorPositionChanged.connect(self.highlightCurrentLine)
 
+        self.locals_added = self.parent().locals
+        self.locals_removed = {}
+
     def emitCode(self):
         self.code.emit(self.toPlainText())
 
+    @contextlib.contextmanager
     def redirect_stdout(self):
         old_stdout = sys.stdout
         old_stderr = sys.stderr
@@ -43,33 +57,93 @@ class InputConsole(TextEdit):
             sys.stdout = old_stdout
             sys.stderr = old_stderr
             self.CODE_EXECUTED.emit()
-            self.user.save(self.toPlainText(), "wb")
+            self.user.save(self.toPlainText(), "w")
+
+    @contextlib.contextmanager
+    def patch_globals(self):
+        backup = globals().copy()
+        backup_keys = set(backup.keys())
+        try:
+            for key in self.locals_added:
+                globals()[key] = self.locals_added[key]
+            for key in self.locals_removed:
+                del globals()[key]
+            yield
+
+        finally:
+            added = {}
+            removed = {}
+            new_keys = set(globals().keys())
+            difference = set({}).union(
+                backup_keys.difference(new_keys),
+                new_keys.difference(backup_keys)
+            )
+            intersection = backup_keys.intersection(new_keys)
+
+            for key in intersection:
+                if backup[key] != globals()[key]:
+                    added[key] = globals()[key]
+            for key in difference:
+                if key in backup:
+                    # Removed
+                    removed[key] = backup[key]
+                elif key in self.locals_added:
+                    del self.locals_added[key]
+                elif key in globals():
+                    # Added
+                    added[key] = globals()[key]
+            self.locals_added = added
+            self.locals_removed = removed
+            for key in self.locals_added:
+                del globals()[key]
+            globals().update(backup)
 
     def executeContents(self):
-        for pipe in self.redirect_stdout():
-            result = "default"
-            for line in self.toPlainText().split("\n"):
-                if result is True:
-                    # We are expecting more input.
-                    if not line.startswith(" "):
-                        # We are going to attempt to add a newline in there.
-                        self.interpreter.push("")
-                result = self.interpreter.push(line)
+        self.executeCode(self.toPlainText())
 
     def executeSelected(self):
-        selected_text = "\n".join(self.textCursor().selectedText().splitlines())
+        lines = self.textCursor().selectedText().splitlines()
+        selected_text = "\n".join(lines)
         if selected_text:
-            for pipe in self.redirect_stdout():
-                result = "default"
-                for line in selected_text.split("\n"):
-                    if result is True:
-                        # We are expecting more input.
-                        if not line.startswith(" "):
-                            # We are going to attempt to add a newline in there.
-                            self.interpreter.push("")
-                    result = self.interpreter.push(line)
+            try:
+                self.executeCode(selected_text)
+            except BaseException as err:
+                row = self.textCursor().blockNumber()
+                with self.redirect_stdout():
+                    import traceback
+                    message = traceback.format_exception_only(type(err), err)
+                    error = self.EXCEPTION_MESSAGE.format(
+                        exception="\n".join(message),
+                        start_row=row+1,
+                        end_row=row+len(lines)
+                    )
+                    print(error)
         else:
             self.executeContents()
+
+    def executeCode(self, code):
+        if "del " in code:
+            code = re.sub(r"(\s*)del\s([^;\n]+)", r"\1if '\2' in locals():\n\1    del \2\n\1else:\n\1    del globals()['\2']", code)
+        with self.redirect_stdout():
+            with self.patch_globals():
+                result = ""
+                ___locals = locals().copy()
+                try:
+                    result = eval(code, globals(), globals())
+                except SyntaxError:
+                    if six.PY3:
+                        six.exec_(code)
+                    else:
+                        six.exec_(code, globals=globals(), locals=globals())
+                except BaseException:
+                    raise
+
+                for key in set(locals().keys()).difference(set(___locals.keys())):
+                    if key != "_%s___locals" % self.__class__.__name__:
+                        globals()[key] = locals()[key]
+
+                if result:
+                    print(result)
 
     @staticmethod
     def mimeTypes():
@@ -117,15 +191,16 @@ class InputConsole(TextEdit):
     def loadUserCache(self):
         userCode = self.user.read()
         if userCode:
-            self.document().setPlainText(userCode)
+            self.document().setPlainText(text_type(userCode))
         else:
             self.document().setPlainText(DEFAULT_CODE)
 
     def saveUserCache(self):
-        self.user.save(self.document().toPlainText(), "wb")
+        self.user.save(self.document().toPlainText(), "w")
 
     def createStandardContextMenu(self):
         menu = super(TextEdit, self).createStandardContextMenu()
+        menu.addSeparator()
         menu.addAction("Execute Code", self.executeContents)
         menu.addAction("Execute Selected", self.executeSelected)
         return menu
