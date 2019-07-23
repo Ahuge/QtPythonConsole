@@ -19,7 +19,7 @@ class ConsoleDialog(QtWidgets.QDialog):
         self.top_layout.addWidget(self.console_widget)
 
         # set properties
-        self.setWindowTitle("Rv Python Console")
+        self.setWindowTitle("Python Console")
         self.top_layout.setSpacing(0)
         self.top_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -35,7 +35,7 @@ class ConsoleWidget(QtWidgets.QWidget):
         self.output_console = OutputConsole()
         self.locals = _locals
         self.input_console = InputConsole(
-            appname="Rv Python Terminal",
+            appname="Python Terminal",
             stdout=self.output_console.stdin,
             parent=self,
         )
