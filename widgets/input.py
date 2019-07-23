@@ -304,8 +304,6 @@ RuntimeError: The following exception was thrown while executing code from line 
         modules = []
         extra_part = None
         for module in sys.modules:
-            if "os" in module:
-                print(module)
             if module == completionPrefix.rstrip("."):
                 modules.append(sys.modules[module])
                 break
