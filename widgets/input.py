@@ -2,6 +2,7 @@ import contextlib
 import sys
 import json
 import re
+import types
 
 from Qt import QtCore, QtGui, QtWidgets
 import six
@@ -17,6 +18,7 @@ DEFAULT_CODE = '#use the variable "projects" to refer to currently selected item
 
 class InputConsole(TextEdit):
     code = QtCore.Signal(str)
+    clear_output = QtCore.Signal()
     CODE_EXECUTED = QtCore.Signal()
     LINE_CONST = "LINENUMBERCONST"
     EXCEPTION_MESSAGE = """
@@ -26,7 +28,6 @@ RuntimeError: The following exception was thrown while executing code from line 
     def __init__(self, parent=None, code=None, appname=None, stdout=None):
         super(InputConsole, self).__init__(parent)
         self.completer = None
-        self.namespace = globals().copy()
         self.setCompleter(Completer([]))
         self.user = User(appname)
         self.stdout = stdout
@@ -41,6 +42,11 @@ RuntimeError: The following exception was thrown while executing code from line 
 
         self.locals_added = self.parent().locals
         self.locals_removed = {}
+
+        pal = QtGui.QPalette()
+        bgc = QtGui.QColor(35, 35, 35)
+        pal.setColor(QtGui.QPalette.Base, bgc)
+        self.setPalette(pal)
 
     def emitCode(self):
         self.code.emit(self.toPlainText())
@@ -97,6 +103,11 @@ RuntimeError: The following exception was thrown while executing code from line 
             for key in self.locals_added:
                 del globals()[key]
             globals().update(backup)
+
+    @property
+    def namespace(self):
+        with self.patch_globals():
+            return globals()
 
     def executeContents(self):
         self.executeCode(self.toPlainText())
@@ -226,13 +237,14 @@ RuntimeError: The following exception was thrown while executing code from line 
 
     def insertCompletion(self, string):
         tc = self.textCursor()
-        tc.movePosition(QtGui.QTextCursor.StartOfWord, QtGui.QTextCursor.KeepAnchor)
+        tc.movePosition(QtGui.QTextCursor.StartOfBlock, QtGui.QTextCursor.KeepAnchor)
         tc.insertText(string)
         self.setTextCursor(tc)
 
     def textUnderCursor(self):
         tc = self.textCursor()
         tc.select(QtGui.QTextCursor.WordUnderCursor)
+        tc.select(QtGui.QTextCursor.BlockUnderCursor)
         return tc.selectedText()
 
     def keyPressEvent(self, e):
@@ -249,40 +261,83 @@ RuntimeError: The following exception was thrown while executing code from line 
             self.setTextCursor(tc)
             return
 
+        elif (
+                e.modifiers() & QtCore.Qt.ControlModifier and e
+                .modifiers() & QtCore.Qt.ShiftModifier and
+                e.key() == QtCore.Qt.Key_C
+        ):
+            self.clear_output.emit()
+            e.accept()
+            return
+
         # Completer in progress
         if self.completer and self.completer.popup().isVisible():
             if e.key() in (QtCore.Qt.Key_Enter, QtCore.Qt.Key_Return, QtCore.Qt.Key_Escape,
                            QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab):
                 e.ignore()
                 return
-
-        isShortcut = ((e.modifiers() & QtCore.Qt.ControlModifier) and e.key() == QtCore.Qt.Key_E)
-        if not self.completer or not isShortcut:
+            else:
+                self.run_completion(e)
+        else:
             return super(TextEdit, self).keyPressEvent(e)
 
-        ctrlOrShift = e.modifiers() & (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier)
-        if not self.completer or (ctrlOrShift and not e.text()):
+    def run_completion(self, event):
+        isShortcut = ((event.modifiers() & QtCore.Qt.ControlModifier) and event.key() == QtCore.Qt.Key_E)
+        if not self.completer or not isShortcut:
+            return super(TextEdit, self).keyPressEvent(event)
+
+        ctrlOrShift = event.modifiers() & (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier)
+        if not self.completer or (ctrlOrShift and not event.text()):
             return
 
         eow = str("~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-=")
-        hasModifier = (e.modifiers() != QtCore.Qt.NoModifier) and not ctrlOrShift
-        completionPrefix = self.textUnderCursor()
+        hasModifier = (event.modifiers() != QtCore.Qt.NoModifier) and not ctrlOrShift
+        completionPrefix = self.textUnderCursor().strip()
 
         if (not isShortcut
             and (hasModifier
-                 or not e.text()
+                 or not event.text()
                  or len(completionPrefix) < 2
-                 or e.text()[-1] in eow)):
+                 or event.text()[-1] in eow)):
             self.completer.popup().hide()
             return
 
-        itemList = self.namespace.keys()
-        self.completer.update([k for k in itemList if completionPrefix in k])
-        self.completer.popup().setCurrentIndex(self.completer.completionModel().index(0, 0))
+        modules = []
+        extra_part = None
+        for module in sys.modules:
+            if "os" in module:
+                print(module)
+            if module == completionPrefix.rstrip("."):
+                modules.append(sys.modules[module])
+                break
+            elif completionPrefix in module:
+                modules.append(sys.modules[module])
+                break
+            elif "." in completionPrefix and module == ".".join(completionPrefix.split(".")[:-1]):
+                extra_part = completionPrefix.split(".")[-1]
+                completionPrefix = ".".join(completionPrefix.split(".")[:-1])
+                modules.append(sys.modules[module])
+                break
+        items = []
+        for module in modules:
+            for key in dir(module):
+                if key.startswith("__") and not key.endswith("__"):
+                    # Remove double underscore
+                    continue
+                items.append("%s.%s" % (completionPrefix.rstrip("."), key))
+
+        if extra_part:
+            items = list(filter(lambda k: completionPrefix + "." + extra_part in k, items))
+
+        self.completer.update(items)
+        self.completer.popup().setCurrentIndex(
+            self.completer.completionModel().index(0, 0)
+        )
 
         cr = self.cursorRect()
         cr.setWidth(self.completer.popup().sizeHintForColumn(0)
                     + self.completer.popup().verticalScrollBar().sizeHint().width())
+        self.textCursor().select(QtGui.QTextCursor.BlockUnderCursor)
         self.completer.complete(cr)
 
     def setCode(self, code):
