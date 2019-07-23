@@ -1,6 +1,7 @@
-from cStringIO import StringIO
+from six.moves import cStringIO as StringIO
+
 from Qt import QtGui
-from textedit import TextEdit
+from .textedit import TextEdit
 
 
 class OutputConsole(TextEdit):
@@ -18,9 +19,21 @@ class OutputConsole(TextEdit):
         self.setPalette(pal)
 
     def read_stdin(self):
-        self.document().setPlainText(self.stdin.getvalue())
+        value = self.stdin.getvalue()
+        value = value.replace("\0", "")
+        self.document().setPlainText(value)
         self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
 
     def clear(self):
         self.stdin.truncate(0)
         self.document().setPlainText("")
+
+    def createStandardContextMenu(self):
+        menu = super(TextEdit, self).createStandardContextMenu()
+        menu.addSeparator()
+        menu.addAction("Clear...", self.clear)
+        return menu
+
+    def contextMenuEvent(self, event):
+        menu = self.createStandardContextMenu()
+        menu.exec_(self.mapToGlobal(event.pos()))
