@@ -2,6 +2,7 @@ import getpass
 import os
 import logging
 import platform
+import six
 
 logger = logging.getLogger("QtPythonConsole")
 
@@ -35,16 +36,16 @@ class User(object):
             os.makedirs(os.path.dirname(preference))
         return preference
 
-    def save(self, text_data, mode="wb"):
+    def save(self, text_data, mode="w"):
         with open(self.getPreferenceFile(), mode) as fh:
-            fh.write(text_data)
+            fh.write(six.text_type(text_data))
         logger.debug("Preference file updated at %s" % self.getPreferenceFile())
 
     def read(self):
         if not os.path.exists(self.getPreferenceFile()):
             text_data = ""
         else:
-            with open(self.getPreferenceFile(), "rb") as fh:
+            with open(self.getPreferenceFile(), "r") as fh:
                 text_data = fh.read()
             logger.debug("Preference file loaded from %s" % self.getPreferenceFile())
         return text_data
