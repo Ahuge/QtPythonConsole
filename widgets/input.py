@@ -145,7 +145,7 @@ RuntimeError: The following exception was thrown while executing code from line 
                     if six.PY3:
                         six.exec_(code)
                     else:
-                        six.exec_(code, globals=globals(), locals=globals())
+                        six.exec_(code)
                 except BaseException:
                     raise
 
