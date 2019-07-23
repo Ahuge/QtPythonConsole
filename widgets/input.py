@@ -276,10 +276,9 @@ RuntimeError: The following exception was thrown while executing code from line 
                            QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab):
                 e.ignore()
                 return
-            else:
-                self.run_completion(e)
-        else:
-            return super(TextEdit, self).keyPressEvent(e)
+        if e.modifiers() & QtCore.Qt.ControlModifier and e.key() == QtCore.Qt.Key_E:
+            self.run_completion(e)
+        return super(TextEdit, self).keyPressEvent(e)
 
     def run_completion(self, event):
         isShortcut = ((event.modifiers() & QtCore.Qt.ControlModifier) and event.key() == QtCore.Qt.Key_E)
